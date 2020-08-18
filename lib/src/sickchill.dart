@@ -18,7 +18,8 @@ class SickChill {
     }
   }
 
-  /// [baseUrl] url of the transmission server instance, default to http://localhost:8081
+  /// [baseUrl] url of the sickchill server instance, default to http://localhost:8081
+  /// [apiKey] key to access sickchill instance, can be found on web interface in settings
   /// [enableLogs] boolean to show http logs or not
   factory SickChill({String baseUrl, @required String apiKey, bool enableLogs = false}) {
     baseUrl ??= 'http://localhost:8081';
@@ -55,6 +56,9 @@ class SickChill {
     return _rawEpisodeQuality.join('|');
   }
 
+  /// Add a show to sickchill, lot of things can be customized like
+  /// [quality] episodes [status] define if you to [searchSubtitles]
+  /// tag if [isAnime] or define a custom [location]
   Future<void> addShow({
     @required int indexerId,
     int tvdbid,
@@ -107,6 +111,9 @@ class SickChill {
     await _makeRequest(command);
   }
 
+  /// Set [status] of an episode or a full season
+  /// It need the [showId] and [seasonNumber]
+  /// An optional [episodeNumber] can be pass to limit the change to one episode
   Future<TvShowEpisode> setEpisodeStatus({
     @required int showId,
     @required TvShowEpisodeStatus status,
@@ -123,18 +130,21 @@ class SickChill {
     return TvShowEpisode._(episodeNumber, result.data);
   }
 
+  /// Get episode details
   Future<TvShowEpisode> getEpisode(int showId, int seasonNumber, String episodeNumber) async {
     final command = 'episode&indexerid=$showId&season=$seasonNumber&episode=$episodeNumber';
     final result = await _makeRequest(command);
     return TvShowEpisode._(episodeNumber, result.data);
   }
 
+  /// Trigger a search for the given episode
   Future<TvShowEpisode> searchEpisode(int showId, int seasonNumber, String episodeNumber) async {
     final command = 'episode.search&indexerid=$showId&season=$seasonNumber&episode=$episodeNumber';
     await _makeRequest(command);
     return getEpisode(showId, seasonNumber, episodeNumber);
   }
 
+  /// Search a show on tvdb
   Future<List<TvShowResult>> searchShow(String name, {String language, bool onlyNew = true}) async {
     var command = 'sb.searchindexers&name=$name&only_new=${onlyNew ? 1 : 0}';
     if (language != null) {
@@ -144,12 +154,15 @@ class SickChill {
     return results.data['results'].map((e) => TvShowResult._(e)).cast<TvShowResult>().toList(growable: false);
   }
 
+  /// Trigger a subtitle search for the given episode
   Future<TvShowEpisode> searchEpisodeSubtitle(int showId, int seasonNumber, String episodeNumber) async {
     final command = 'episode.subtitlesearch&indexerid=$showId&season=$seasonNumber&episode=$episodeNumber';
     await _makeRequest(command);
     return getEpisode(showId, seasonNumber, episodeNumber);
   }
 
+  /// Get seasons details of a show by a [showId],
+  /// Specific season can be retrieve by passing the [seasonNumber]
   Future<List<TvShowSeason>> getSeasons(int showId, {int seasonNumber}) async {
     var command = 'show.seasons&indexerid=$showId';
     if (seasonNumber != null) {
@@ -179,26 +192,31 @@ class SickChill {
     return seasons;
   }
 
+  /// Force full update of a show
   Future<void> forceFullUpdateShow(int id) async {
     final command = 'show.update&indexerid=$id';
     await _makeRequest(command);
   }
 
+  /// Rescan files of a show to update show's data
   Future<void> refreshShowFromDisk(int id) async {
     final command = 'show.refresh&indexerid=$id';
     await _makeRequest(command);
   }
 
+  /// Pause or resume a show
   Future<void> pauseShow(int id, bool paused) async {
     final command = 'show.pause&indexerid=$id&pause=${paused ? 1 : 0}';
     await _makeRequest(command);
   }
 
+  /// Remove show from sickchill, can also [removeFiles]
   Future<void> removeShow(int id, {bool removeFiles = false}) async {
     final command = 'show.delete&indexerid=$id&removefiles=${removeFiles ? 1 : 0}';
     await _makeRequest(command);
   }
 
+  /// Get show details
   Future<TvShowDetails> getShowDetails(int id, {bool loadSeasonInfo = false}) async {
     final command = 'show&indexerid=$id';
     final result = await _makeRequest(command);
@@ -209,6 +227,8 @@ class SickChill {
     return TvShowDetails._(seasons, result.data, _baseUrl + '/cache/images/', _baseUrl + '/images/');
   }
 
+  /// Get list of show in sickchill, by default sort by next episode air date,
+  /// but can by sorted by id or name
   Future<List<TvShow>> getShows({TvShowSort sort = TvShowSort.nextEpisode, bool paused}) async {
     var command = 'shows';
     if (sort == TvShowSort.id) {

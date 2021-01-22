@@ -1,3 +1,7 @@
+## [0.0.3]
+
+* add ability to use proxy url
+
 ## [0.0.2] 
 
 * Fix meta deps 

@@ -5,11 +5,12 @@ import 'package:intl/intl.dart';
 import 'package:meta/meta.dart';
 
 class SickChill {
+  final bool proxified;
   final bool enableLogs;
   final Dio _dio;
   final String _baseUrl;
 
-  SickChill._(this._baseUrl, this._dio, this.enableLogs) {
+  SickChill._(this._baseUrl, this._dio, this.proxified, this.enableLogs) {
     if (enableLogs) {
       _dio.interceptors.add(LogInterceptor(
         requestBody: true,
@@ -19,11 +20,12 @@ class SickChill {
   }
 
   /// [baseUrl] url of the sickchill server instance, default to http://localhost:8081
+  /// [proxyUrl] proxy url to use, urls will be added at the end, default to null
   /// [apiKey] key to access sickchill instance, can be found on web interface in settings
   /// [enableLogs] boolean to show http logs or not
-  factory SickChill({String baseUrl, @required String apiKey, bool enableLogs = false}) {
+  factory SickChill({String baseUrl, String proxyUrl, @required String apiKey, bool enableLogs = false}) {
     baseUrl ??= 'http://localhost:8081';
-    return SickChill._(baseUrl, Dio(BaseOptions(baseUrl: baseUrl + '/api/$apiKey')), enableLogs);
+    return SickChill._(proxyUrl == null ? baseUrl: proxyUrl+Uri.encodeComponent(baseUrl), Dio(BaseOptions(baseUrl: proxyUrl == null ? '$baseUrl/api/$apiKey':proxyUrl+Uri.encodeComponent('$baseUrl/api/$apiKey'))), proxyUrl != null, enableLogs);
   }
 
   String _qualityToRawQuality(TvShowEpisodeQuality quality) {
@@ -224,7 +226,7 @@ class SickChill {
     if (loadSeasonInfo) {
       seasons = await getSeasons(id);
     }
-    return TvShowDetails._(seasons, result.data, _baseUrl + '/cache/images/', _baseUrl + '/images/');
+    return TvShowDetails._(seasons, result.data, _baseUrl + (proxified ? Uri.encodeComponent('/cache/images/'):'/cache/images/'), _baseUrl + (proxified ? Uri.encodeComponent('/images/'):'/images/'), (proxified ? Uri.encodeComponent('/'):'/'), proxified);
   }
 
   /// Get list of show in sickchill, by default sort by next episode air date,
@@ -243,7 +245,7 @@ class SickChill {
     }
 
     final result = await _makeRequest(command);
-    final list = result.data.values.map((e) => TvShow._(e, _baseUrl + '/cache/images/', _baseUrl + '/images/')).toList();
+    final list = result.data.values.map((e) => TvShow._(e, _baseUrl + (proxified ? Uri.encodeComponent('/cache/images/'):'/cache/images/'), _baseUrl + (proxified ? Uri.encodeComponent('/images/'):'/images/'), (proxified ? Uri.encodeComponent('/'):'/'), proxified)).toList();
     var sortedList = list;
     if (sort == TvShowSort.nextEpisode) {
       final int Function(TvShow, TvShow) sortByName = (tv1, tv2) {
@@ -269,7 +271,7 @@ class SickChill {
   }
 
   Future<_Response> _makeRequest(String cmd) async {
-    final result = await _dio.get('/?cmd=$cmd');
+    final result = await _dio.get(proxified ? Uri.encodeComponent('/?cmd=$cmd'):'/?cmd=$cmd');
     if (result.statusCode == 200) {
       final response = _Response.fromJSON(result.data);
       _checkResults(response);
@@ -408,7 +410,9 @@ class TvShowDetails extends TvShow {
     Map<String, dynamic> rawData,
     String baseUrlImagesCache,
     String baseUrlImages,
-  ) : super._(rawData, baseUrlImagesCache, baseUrlImages);
+    String pathSeparator,
+    bool needEncoding,
+  ) : super._(rawData, baseUrlImagesCache, baseUrlImages, pathSeparator, needEncoding);
 
   List<TvShowSeason> seasons;
 
@@ -434,9 +438,11 @@ class TvShowDetails extends TvShow {
 class TvShow {
   final Map<String, dynamic> _rawData;
   final String _baseUrlImages;
+  final String _pathSeparator;
   final String _baseUrlImagesCache;
+  final bool _needEncoding;
 
-  TvShow._(this._rawData, this._baseUrlImagesCache, this._baseUrlImages);
+  TvShow._(this._rawData, this._baseUrlImagesCache, this._baseUrlImages, this._pathSeparator, this._needEncoding);
 
   int get id => _rawData['indexerid'];
 
@@ -448,7 +454,7 @@ class TvShow {
 
   String get network => _rawData['network'];
 
-  String get networkImage => _baseUrlImages + 'network/${network.toLowerCase()}.png';
+  String get networkImage => _baseUrlImages + 'network$_pathSeparator${_needEncoding ? Uri.encodeComponent(network.toLowerCase()):network.toLowerCase()}.png';
 
   bool get hasBanner => _rawData['cache']['banner'] == 1;
 
@@ -462,11 +468,11 @@ class TvShow {
 
   String get poster => hasPoster ? _baseUrlImagesCache + '$id.poster.jpg' : _baseUrlImages + 'poster.png';
 
-  String get posterThumbnail => hasPosterThumbnail ? _baseUrlImagesCache + 'thumbnails/$id.poster.jpg' : _baseUrlImages + 'poster.png';
+  String get posterThumbnail => hasPosterThumbnail ? _baseUrlImagesCache + 'thumbnails$_pathSeparator$id.poster.jpg' : _baseUrlImages + 'poster.png';
 
   String get banner => hasBanner ? _baseUrlImagesCache + '$id.banner.jpg' : _baseUrlImages + 'banner.png';
 
-  String get bannerThumbnail => hasBannerThumbnail ? _baseUrlImagesCache + 'thumbnails/$id.banner.jpg' : _baseUrlImages + 'banner.png';
+  String get bannerThumbnail => hasBannerThumbnail ? _baseUrlImagesCache + 'thumbnails$_pathSeparator$id.banner.jpg' : _baseUrlImages + 'banner.png';
 
   String get fanart => hasFanart ? _baseUrlImagesCache + '$id.fanart.jpg' : null;
 

@@ -1,6 +1,6 @@
 name: sickchill
 description: Dart package to manage remote sickchill instance
-version: 0.0.2
+version: 0.0.3
 homepage: https://github.com/mylisabox/sickchill
 
 environment:

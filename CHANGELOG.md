@@ -1,3 +1,7 @@
+## [0.1.0]
+
+* migrate to null safety
+
 ## [0.0.3]
 
 * add ability to use proxy url

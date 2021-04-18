@@ -6,7 +6,7 @@ main() async {
   final api = SickChill(apiKey: 'MyAPIKeyHere', baseUrl: 'http://192.168.1.35:8081/', enableLogs: true);
   final shows = await api.getShows();
   for (var i = 0; i < shows.length; i++) {
-    print(shows[i].name + ' ' + shows[i].nextEpisodeStr);
+    print(shows[i].name + ' ' + shows[i].nextEpisodeStr!);
   }
   final seasons = await api.getSeasons(shows.first.id);
   print(seasons);

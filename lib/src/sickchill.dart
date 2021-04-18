@@ -2,7 +2,6 @@ import 'dart:convert';
 
 import 'package:dio/dio.dart';
 import 'package:intl/intl.dart';
-import 'package:meta/meta.dart';
 
 class SickChill {
   final bool proxified;
@@ -23,7 +22,7 @@ class SickChill {
   /// [proxyUrl] proxy url to use, urls will be added at the end, default to null
   /// [apiKey] key to access sickchill instance, can be found on web interface in settings
   /// [enableLogs] boolean to show http logs or not
-  factory SickChill({String baseUrl, String proxyUrl, @required String apiKey, bool enableLogs = false}) {
+  factory SickChill({String? baseUrl, String? proxyUrl, required String apiKey, bool enableLogs = false}) {
     baseUrl ??= 'http://localhost:8081';
     return SickChill._(proxyUrl == null ? baseUrl: proxyUrl+Uri.encodeComponent(baseUrl), Dio(BaseOptions(baseUrl: proxyUrl == null ? '$baseUrl/api/$apiKey':proxyUrl+Uri.encodeComponent('$baseUrl/api/$apiKey'))), proxyUrl != null, enableLogs);
   }
@@ -32,28 +31,20 @@ class SickChill {
     switch (quality) {
       case TvShowEpisodeQuality.all:
         return _rawEpisodeQuality.join('|');
-        break;
       case TvShowEpisodeQuality.sd:
         return _rawEpisodeQuality.where((element) => element.contains('sd')).join('|');
-        break;
       case TvShowEpisodeQuality.hd:
         return _rawEpisodeQuality.where((element) => element.contains('hd')).join('|');
-        break;
       case TvShowEpisodeQuality.hd720:
         return _rawEpisodeQuality[2] + '|' + _rawEpisodeQuality[5] + '|' + _rawEpisodeQuality[7];
-        break;
       case TvShowEpisodeQuality.hd1080:
         return _rawEpisodeQuality[4] + '|' + _rawEpisodeQuality[6] + '|' + _rawEpisodeQuality[8];
-        break;
       case TvShowEpisodeQuality.uhd:
         return _rawEpisodeQuality.where((element) => element.contains('udh')).join('|');
-        break;
       case TvShowEpisodeQuality.uhd4K:
         return _rawEpisodeQuality.where((element) => element.contains('4k')).join('|');
-        break;
       case TvShowEpisodeQuality.uhd8K:
         return _rawEpisodeQuality.where((element) => element.contains('8k')).join('|');
-        break;
     }
     return _rawEpisodeQuality.join('|');
   }
@@ -62,19 +53,19 @@ class SickChill {
   /// [quality] episodes [status] define if you to [searchSubtitles]
   /// tag if [isAnime] or define a custom [location]
   Future<void> addShow({
-    @required int indexerId,
-    int tvdbid,
-    TvShowEpisodeStatus status,
-    TvShowEpisodeStatus futureStatus,
+    required int indexerId,
+    int? tvdbid,
+    TvShowEpisodeStatus? status,
+    TvShowEpisodeStatus? futureStatus,
     bool scene = false,
     bool flattenFolders = true,
     bool isAnime = false,
-    String location,
+    String? location,
     String lang = 'en',
     bool searchSubtitles = true,
     bool seasonFolders = true,
-    TvShowEpisodeQuality quality,
-    TvShowEpisodeQuality archive,
+    TvShowEpisodeQuality? quality,
+    TvShowEpisodeQuality? archive,
   }) async {
     var command = 'show.addnew&indexerid=$indexerId&lang=$lang';
 
@@ -117,26 +108,38 @@ class SickChill {
   /// It need the [showId] and [seasonNumber]
   /// An optional [episodeNumber] can be pass to limit the change to one episode
   Future<TvShowEpisode> setEpisodeStatus({
-    @required int showId,
-    @required TvShowEpisodeStatus status,
-    @required String seasonNumber,
-    String episodeNumber,
+    required int showId,
+    required TvShowEpisodeStatus status,
+    required String seasonNumber,
+    required String episodeNumber,
     bool force = false,
   }) async {
     final statusStr = status.toString().split('.')[1];
-    var command = 'episode.setstatus&indexerid=$showId&season=$seasonNumber&status=$statusStr';
-    if (episodeNumber != null) {
-      command += '&episode=$episodeNumber';
-    }
+    final command = 'episode.setstatus&indexerid=$showId&season=$seasonNumber&status=$statusStr&episode=$episodeNumber';
     final result = await _makeRequest(command);
-    return TvShowEpisode._(episodeNumber, result.data);
+    _checkResults(result);
+    return TvShowEpisode._(episodeNumber, result.data as Map<String, dynamic>);
+  }
+
+  /// Set [status] for a full season
+  /// It need the [showId] and [seasonNumber]
+  Future<void> setSeasonStatus({
+    required int showId,
+    required TvShowEpisodeStatus status,
+    required String seasonNumber,
+    bool force = false,
+  }) async {
+    final statusStr = status.toString().split('.')[1];
+    final command = 'episode.setstatus&indexerid=$showId&season=$seasonNumber&status=$statusStr';
+    final result = await _makeRequest(command);
+    _checkResults(result);
   }
 
   /// Get episode details
   Future<TvShowEpisode> getEpisode(int showId, int seasonNumber, String episodeNumber) async {
     final command = 'episode&indexerid=$showId&season=$seasonNumber&episode=$episodeNumber';
     final result = await _makeRequest(command);
-    return TvShowEpisode._(episodeNumber, result.data);
+    return TvShowEpisode._(episodeNumber, result.data as Map<String, dynamic>);
   }
 
   /// Trigger a search for the given episode
@@ -147,13 +150,13 @@ class SickChill {
   }
 
   /// Search a show on tvdb
-  Future<List<TvShowResult>> searchShow(String name, {String language, bool onlyNew = true}) async {
+  Future<List<TvShowResult>> searchShow(String name, {String? language, bool onlyNew = true}) async {
     var command = 'sb.searchindexers&name=$name&only_new=${onlyNew ? 1 : 0}';
     if (language != null) {
       command += '&language=$language';
     }
     final results = await _makeRequest(command);
-    return results.data['results'].map((e) => TvShowResult._(e)).cast<TvShowResult>().toList(growable: false);
+    return results.data!['results'].map((e) => TvShowResult._(e)).cast<TvShowResult>().toList(growable: false);
   }
 
   /// Trigger a subtitle search for the given episode
@@ -165,7 +168,7 @@ class SickChill {
 
   /// Get seasons details of a show by a [showId],
   /// Specific season can be retrieve by passing the [seasonNumber]
-  Future<List<TvShowSeason>> getSeasons(int showId, {int seasonNumber}) async {
+  Future<List<TvShowSeason>> getSeasons(int showId, {int? seasonNumber}) async {
     var command = 'show.seasons&indexerid=$showId';
     if (seasonNumber != null) {
       command += '&season=$seasonNumber';
@@ -175,7 +178,7 @@ class SickChill {
     final rawSeasons = result.data;
     final seasons = <TvShowSeason>[];
     if (seasonNumber == null) {
-      rawSeasons.forEach((number, rawEpisodes) {
+      rawSeasons!.forEach((number, rawEpisodes) {
         final episodes = <TvShowEpisode>[];
         rawEpisodes.forEach((episodeNumber, episodeRawData) {
           episodes.add(TvShowEpisode._(episodeNumber, episodeRawData));
@@ -185,7 +188,7 @@ class SickChill {
       });
     } else {
       final episodes = <TvShowEpisode>[];
-      rawSeasons.forEach((episodeNumber, episodeRawData) {
+      rawSeasons!.forEach((episodeNumber, episodeRawData) {
         episodes.add(TvShowEpisode._(episodeNumber, episodeRawData));
       });
 
@@ -222,16 +225,16 @@ class SickChill {
   Future<TvShowDetails> getShowDetails(int id, {bool loadSeasonInfo = false}) async {
     final command = 'show&indexerid=$id';
     final result = await _makeRequest(command);
-    List<TvShowSeason> seasons;
+    List<TvShowSeason>? seasons;
     if (loadSeasonInfo) {
       seasons = await getSeasons(id);
     }
-    return TvShowDetails._(seasons, result.data, _baseUrl + (proxified ? Uri.encodeComponent('/cache/images/'):'/cache/images/'), _baseUrl + (proxified ? Uri.encodeComponent('/images/'):'/images/'), (proxified ? Uri.encodeComponent('/'):'/'), proxified);
+    return TvShowDetails._(seasons, result.data as Map<String, dynamic>, _baseUrl + (proxified ? Uri.encodeComponent('/cache/images/'):'/cache/images/'), _baseUrl + (proxified ? Uri.encodeComponent('/images/'):'/images/'), (proxified ? Uri.encodeComponent('/'):'/'), proxified);
   }
 
   /// Get list of show in sickchill, by default sort by next episode air date,
   /// but can by sorted by id or name
-  Future<List<TvShow>> getShows({TvShowSort sort = TvShowSort.nextEpisode, bool paused}) async {
+  Future<List<TvShow>> getShows({TvShowSort sort = TvShowSort.nextEpisode, bool? paused}) async {
     var command = 'shows';
     if (sort == TvShowSort.id) {
       command = '$command&sort=id';
@@ -245,7 +248,7 @@ class SickChill {
     }
 
     final result = await _makeRequest(command);
-    final list = result.data.values.map((e) => TvShow._(e, _baseUrl + (proxified ? Uri.encodeComponent('/cache/images/'):'/cache/images/'), _baseUrl + (proxified ? Uri.encodeComponent('/images/'):'/images/'), (proxified ? Uri.encodeComponent('/'):'/'), proxified)).toList();
+    final list = result.data!.values.map((e) => TvShow._(e, _baseUrl + (proxified ? Uri.encodeComponent('/cache/images/'):'/cache/images/'), _baseUrl + (proxified ? Uri.encodeComponent('/images/'):'/images/'), (proxified ? Uri.encodeComponent('/'):'/'), proxified)).toList();
     var sortedList = list;
     if (sort == TvShowSort.nextEpisode) {
       final int Function(TvShow, TvShow) sortByName = (tv1, tv2) {
@@ -253,7 +256,7 @@ class SickChill {
       };
       final nextEp = list.where((element) => element.nextEpisode != null && !element.isPaused).toList()
         ..sort((tv1, tv2) {
-          final compareResult = tv1.nextEpisode.compareTo(tv2.nextEpisode);
+          final compareResult = tv1.nextEpisode!.compareTo(tv2.nextEpisode!);
 
           if (compareResult == 0) {
             return sortByName(tv1, tv2);
@@ -348,16 +351,16 @@ class TvShowResult {
 
   String get name => _rawData['name'];
 
-  String get firstAiredStr => _rawData['first_aired'];
+  String? get firstAiredStr => _rawData['first_aired'];
 
-  DateTime get firstAired {
-    if (firstAiredStr == null || firstAiredStr.isEmpty || firstAiredStr.toLowerCase() == 'never') {
+  DateTime? get firstAired {
+    if (firstAiredStr == null || firstAiredStr!.isEmpty || firstAiredStr!.toLowerCase() == 'never') {
       return null;
     }
-    return _dateFormat.parse(firstAiredStr);
+    return _dateFormat.parse(firstAiredStr!);
   }
 
-  int get tvdbid => _rawData['tvdbid'];
+  int? get tvdbid => _rawData['tvdbid'];
 
   @override
   String toString() {
@@ -372,28 +375,28 @@ class TvShowEpisode {
 
   TvShowEpisode._(this.number, this._rawData);
 
-  String get airdateStr => _rawData['airdate'];
+  String? get airdateStr => _rawData['airdate'];
 
-  DateTime get airdate {
-    if (airdateStr == null || airdateStr.isEmpty || airdateStr.toLowerCase() == 'never') {
+  DateTime? get airdate {
+    if (airdateStr == null || airdateStr!.isEmpty || airdateStr!.toLowerCase() == 'never') {
       return null;
     }
-    return _dateFormat.parse(airdateStr);
+    return _dateFormat.parse(airdateStr!);
   }
 
-  int get fileSize => _rawData['file_size'];
+  int? get fileSize => _rawData['file_size'];
 
-  String get location => _rawData['location'];
+  String? get location => _rawData['location'];
 
-  String get releaseName => _rawData['release_name'];
+  String? get releaseName => _rawData['release_name'];
 
   String get name => _rawData['name'];
 
   String get status => _rawData['status'];
 
-  String get subtitles => _rawData['subtitles'];
+  String? get subtitles => _rawData['subtitles'];
 
-  String get quality => _rawData['quality'];
+  String? get quality => _rawData['quality'];
 
   bool get isDownloaded => status.toLowerCase() == 'downloaded';
 
@@ -414,17 +417,17 @@ class TvShowDetails extends TvShow {
     bool needEncoding,
   ) : super._(rawData, baseUrlImagesCache, baseUrlImages, pathSeparator, needEncoding);
 
-  List<TvShowSeason> seasons;
+  List<TvShowSeason>? seasons;
 
-  String get imdbId => _rawData['imdbid'];
+  String? get imdbId => _rawData['imdbid'];
 
-  List<String> get genre => _rawData['genre'].cast<String>();
+  List<String>? get genre => _rawData['genre']?.cast<String>();
 
-  List<int> get seasonList => _rawData['season_list'].cast<int>();
+  List<int>? get seasonList => _rawData['season_list']?.cast<int>();
 
-  String get location => _rawData['location'];
+  String? get location => _rawData['location'];
 
-  String get airs => _rawData['airs'];
+  String? get airs => _rawData['airs'];
 
   bool get isDvdOrder => _rawData['dvdorder'] == 1;
 
@@ -446,15 +449,15 @@ class TvShow {
 
   int get id => _rawData['indexerid'];
 
-  String get nextEpisodeStr => _rawData['next_ep_airdate'];
+  String? get nextEpisodeStr => _rawData['next_ep_airdate'];
 
-  String get quality => _rawData['quality'];
+  String? get quality => _rawData['quality'];
 
-  String get language => _rawData['language'];
+  String? get language => _rawData['language'];
 
-  String get network => _rawData['network'];
+  String? get network => _rawData['network'];
 
-  String get networkImage => _baseUrlImages + 'network$_pathSeparator${_needEncoding ? Uri.encodeComponent(network.toLowerCase()):network.toLowerCase()}.png';
+  String get networkImage => _baseUrlImages + 'network$_pathSeparator${_needEncoding ? Uri.encodeComponent(network!.toLowerCase()):network!.toLowerCase()}.png';
 
   bool get hasBanner => _rawData['cache']['banner'] == 1;
 
@@ -474,16 +477,16 @@ class TvShow {
 
   String get bannerThumbnail => hasBannerThumbnail ? _baseUrlImagesCache + 'thumbnails$_pathSeparator$id.banner.jpg' : _baseUrlImages + 'banner.png';
 
-  String get fanart => hasFanart ? _baseUrlImagesCache + '$id.fanart.jpg' : null;
+  String? get fanart => hasFanart ? _baseUrlImagesCache + '$id.fanart.jpg' : null;
 
-  DateTime get nextEpisode {
-    if (nextEpisodeStr == null || nextEpisodeStr.isEmpty) {
+  DateTime? get nextEpisode {
+    if (nextEpisodeStr == null || nextEpisodeStr!.isEmpty) {
       return null;
     }
-    return _dateFormat.parse(nextEpisodeStr);
+    return _dateFormat.parse(nextEpisodeStr!);
   }
 
-  int get tvdbid => _rawData['tvdbid'];
+  int? get tvdbid => _rawData['tvdbid'];
 
   String get name => _rawData['show_name'];
 
@@ -513,7 +516,7 @@ class SickChillHttpException {
 
   SickChillHttpException._(this.cause);
 
-  int get status => cause.statusCode;
+  int? get status => cause.statusCode;
 
   @override
   String toString() {
@@ -526,7 +529,7 @@ class SickChillException {
 
   SickChillException._(this.cause);
 
-  String get message => cause.message;
+  String? get message => cause.message;
 
   @override
   String toString() {
@@ -535,9 +538,9 @@ class SickChillException {
 }
 
 class _Response {
-  final String result;
-  final String message;
-  final Map data;
+  final String? result;
+  final String? message;
+  final Map? data;
 
   _Response._(this.result, this.message, this.data);
 
@@ -546,7 +549,7 @@ class _Response {
   factory _Response.fromJSON(Map<String, dynamic> data) {
     var mapData = data['data'];
     if (mapData is List) {
-      mapData = {'data': mapData};
+      mapData = Map.from({'data': mapData});
     }
     return _Response._(data['result'], data['message'], mapData);
   }
